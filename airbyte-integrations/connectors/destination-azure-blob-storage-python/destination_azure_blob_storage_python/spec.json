@@ -1,0 +1,63 @@
+{
+  "documentationUrl": "https://docs.airbyte.com/integrations/destinations/azure-blob-storage-python",
+  "supported_destination_sync_modes": [
+    "overwrite"
+  ],
+  "supportsIncremental": true,
+  "connectionSpecification": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Destination Azure Blob Storage Python",
+    "type": "object",
+    "required": [
+      "storage_account_name",
+      "container_name",
+      "credentials"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "storage_account_name": {
+        "title": "Storage Account Name",
+        "description": "The name of the Azure storage account.",
+        "type": "string",
+        "order": 1
+      },
+      "container_name": {
+        "title": "Container Name",
+        "description": "The name of the Azure blob container.",
+        "type": "string",
+        "order": 2
+      },
+      "credentials": {
+        "title": "Authentication",
+        "description": "Credentials for connecting to Azure Blob Storage",
+        "type": "object",
+        "order": 3,
+        "oneOf": [
+          {
+            "title": "Authenticate via Storage Account Key",
+            "type": "object",
+            "required": ["azure_blob_storage_account_key", "auth_type"],
+            "properties": {
+              "auth_type": {
+                "title": "Auth Type",
+                "default": "Storage Account Key",
+                "const": "Storage Account Key",
+                "enum": ["Storage Account Key"],
+                "type": "string"
+              },
+              "azure_blob_storage_account_key": {
+                "title": "Azure Blob Storage account key",
+                "description": "The Azure blob storage account key.",
+                "airbyte_secret": true,
+                "examples": [
+                  "Z8ZkZpteggFx394vm+PJHnGTvdRncaYS+JhLKdj789YNmD+iyGTnG+PV+POiuYNhBg/ACS+LKjd%4FG3FHGN12Nd=="
+                ],
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+  }
+}
+}

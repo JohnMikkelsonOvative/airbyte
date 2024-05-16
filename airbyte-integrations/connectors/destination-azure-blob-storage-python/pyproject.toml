@@ -1,0 +1,30 @@
+[build-system]
+requires = [ "poetry-core>=1.0.0",]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+version = "0.1.0"
+name = "destination-azure-blob-storage-python"
+description = "Destination implementation for azure-blob-storage-python."
+authors = [ "Airbyte <contact@airbyte.io>",]
+license = "MIT"
+readme = "README.md"
+documentation = "https://docs.airbyte.com/integrations/destinations/azure-blob-storage-python"
+homepage = "https://airbyte.com"
+repository = "https://github.com/airbytehq/airbyte"
+packages = [ { include = "destination_azure_blob_storage_python" }, {include = "main.py" } ]
+
+[tool.poetry.dependencies]
+python = "^3.9,<3.12"
+airbyte-cdk = "^0"
+azure-storage-blob = "^12.20.0"
+retrying = "^1.3.4"
+
+[tool.poetry.scripts]
+destination-azure-blob-storage-python = "destination_azure_blob_storage_python.run:run"
+
+[tool.poetry.group.dev.dependencies]
+requests-mock = "*"
+pytest-mock = "*"
+pytest = "*"
+
