@@ -4,6 +4,7 @@ import enum
 class CredentialsType(enum.Enum):
     SAS_TOKEN = "SAS Token"
     STORAGE_ACCOUNT_KEY = "Storage Account Key"
+    SERVICE_PRINCIPAL_TOKEN = "Service Principal Token"
 
     @staticmethod
     def from_string(s: str):
@@ -11,6 +12,8 @@ class CredentialsType(enum.Enum):
             return CredentialsType.SAS_TOKEN
         elif s == "Storage Account Key":
             return CredentialsType.STORAGE_ACCOUNT_KEY
+        elif s == "Service Principal Token":
+            return CredentialsType.SERVICE_PRINCIPAL_TOKEN
         else:
             raise ValueError(f"Unknown auth mode: {s}")
 
@@ -74,6 +77,10 @@ class ConnectorConfig:
             self.sas_token = self.credentials.get("sas_token")
         if self.credentials_type == CredentialsType.STORAGE_ACCOUNT_KEY:
             self.storage_account_key = self.credentials.get("azure_blob_storage_account_key")
+        if self.credentials_type == CredentialsType.SERVICE_PRINCIPAL_TOKEN:
+            self.tenant_id = self.credentials.get("tenant_id")
+            self.client_id = self.credentials.get("client_id")
+            self.client_secret = self.credentials.get("client_secret")
         else:
             raise Exception("Auth Mode not recognized.")
 
