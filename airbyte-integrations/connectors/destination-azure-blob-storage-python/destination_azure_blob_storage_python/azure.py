@@ -5,6 +5,13 @@ from azure.storage.blob import ContainerClient, BlobClient, BlobProperties
 from airbyte_cdk.destinations import Destination
 from retrying import retry
 
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+from time import time
+
+
 from .config_reader import ConnectorConfig, CredentialsType, OutputFormat
 
 logger = logging.getLogger("airbyte")
@@ -15,6 +22,8 @@ class AzureHandler:
         self._config: ConnectorConfig = connector_config
         self._client: ContainerClient = None
         self._destination: Destination = destination
+        self._blob_client: BlobClient = None
+        self._stream_name: StreamName = None
 
         self.create_client()
 
@@ -42,5 +51,18 @@ class AzureHandler:
     @retry(stop_max_attempt_number=10, wait_random_min=1000)
     def head_blob(self) -> bool:
         return self._client.exists()
+
+    def write_parquet(self, df: pd.DataFrame, stream_name):
+        # write pandas df to table
+        table = pa.Table.from_pandas(df)
+        buf = pa.BufferOutputStream()
+
+        # write parquet file from table to buffer stream
+        pq.write_table(table, buf)
+        current_timestamp = int(time() * 1000)
+        name = stream_name + str(current_timestamp) + ".parquet"
+        #uploads blob with name to the container
+        self._client.upload_blob(name, buf.getvalue().to_pybytes(), overwrite=True)
+
 
 

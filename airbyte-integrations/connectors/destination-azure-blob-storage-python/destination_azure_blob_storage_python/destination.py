@@ -8,11 +8,12 @@ import random, string
 
 from airbyte_cdk import AirbyteLogger
 from airbyte_cdk.destinations import Destination
-from airbyte_cdk.models import AirbyteConnectionStatus, AirbyteMessage, ConfiguredAirbyteCatalog, Status
+from airbyte_cdk.models import AirbyteConnectionStatus, AirbyteMessage, ConfiguredAirbyteCatalog, Status, Type
 from azure.core.exceptions import ClientAuthenticationError
 
 from .azure import AzureHandler
 from .config_reader import ConnectorConfig
+from .stream_writer import StreamWriter
 
 
 class DestinationAzureBlobStoragePython(Destination):
@@ -39,6 +40,64 @@ class DestinationAzureBlobStoragePython(Destination):
         :param input_messages: The stream of input messages received from the source
         :return: Iterable of AirbyteStateMessages wrapped in AirbyteMessage structs
         """
+        connector_config = ConnectorConfig(**config)
+
+        try:
+            azure_handler = AzureHandler(connector_config, self)
+        except ClientError as e:
+            logger.error(f"Could not create session due to exception {repr(e)}")
+            raise Exception(f"Could not create session due to exception {repr(e)}")
+
+        # creating stream writers
+        streams = {
+            s.stream.name: StreamWriter(azure_handler=azure_handler, config=connector_config, configured_stream=s)
+            for s in configured_catalog.streams
+        }
+
+
+
+
+
+        for message in input_messages:
+
+            if message.type == Type.STATE and message.state.type == AirbyteStateType.STREAM:
+                state_stream = message.state.stream
+
+                if not state_stream.stream_state:
+                    stream = state_stream.stream_descriptor.name
+                    print(f"Received empty state for stream {stream}, resetting stream")
+                    if stream in streams:
+                        streams[stream].reset()
+                    else:
+                        print(f"Trying to reset stream {stream} that is not in the configured catalog")
+
+                # Flush records when state is received
+                else:
+                    stream = state_stream.stream_descriptor.name
+                    if stream in streams:
+                        print(f"Got state message from source: flushing records for {stream}")
+                        streams[stream].flush(partial=True)
+                    else:
+                        print(f"Trying to flush stream {stream} that is not in the configured catalog")
+
+                yield message
+
+            elif message.type == Type.RECORD:
+                data = message.record.data
+                stream = message.record.stream
+                streams[stream].append_message(data)
+
+                # Flush records every RECORD_FLUSH_INTERVAL records to limit memory consumption
+                # Records will either get flushed when a state message is received or when hitting the RECORD_FLUSH_INTERVAL
+                if len(streams[stream]._messages) > 1:
+                    print(f"Reached size limit: flushing records for {stream}")
+                    streams[stream].flush(partial=True)
+                    print(streams[stream]._table)
+            else:
+                print(f"Unhandled message type {message.type}: {message}")
+
+        # Flush all or remaining records
+        self._flush_streams(streams)
 
         pass
 
