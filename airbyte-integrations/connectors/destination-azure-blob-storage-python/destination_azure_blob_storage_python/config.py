@@ -39,14 +39,14 @@ class StorageAccountKey(BaseModel):
         title = "Authenticate via Storage Account Key"
         discriminator = "auth_type"
 
-    auth_type: Literal["azure_blob_storage_account_key"] = Field("azure_blob_storage_account_key", const=True)
-    azure_blob_storage_account_key: str = Field(
-        title="Azure Blob Storage account key",
-        description="The Azure blob storage account key.",
-        airbyte_secret=True,
-        examples=["Z8ZkZpteggFx394vm+PJHnGTvdRncaYS+JhLKdj789YNmD+iyGTnG+PV+POiuYNhBg/ACS+LKjd%4FG3FHGN12Nd=="],
-        order=3,
-    )
+    #auth_type: Literal["azure_blob_storage_account_key"] = Field("azure_blob_storage_account_key", const=True)
+    #azure_blob_storage_account_key: str = Field(
+    #    title="Azure Blob Storage account key",
+    #    description="The Azure blob storage account key.",
+    #    airbyte_secret=True,
+    #    examples=["Z8ZkZpteggFx394vm+PJHnGTvdRncaYS+JhLKdj789YNmD+iyGTnG+PV+POiuYNhBg/ACS+LKjd%4FG3FHGN12Nd=="],
+    #    order=3,
+    #)
 
 
 class Config(AbstractFileBasedSpec):
