@@ -67,7 +67,6 @@ class ConnectorConfig:
             credentials: dict = None,
 
     ):
-
         self.storage_account_name = storage_account_name
         self.account_url = f"https://{self.storage_account_name}.blob.core.windows.net"
         self.container_name = container_name
