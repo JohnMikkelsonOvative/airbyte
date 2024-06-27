@@ -36,7 +36,7 @@
           {
             "title": "Authenticate via Storage Account Key",
             "type": "object",
-            "required": ["azure_blob_storage_account_key", "auth_type"],
+            "required": ["auth_type"],
             "properties": {
               "auth_type": {
                 "title": "Auth Type",
@@ -50,7 +50,48 @@
                 "description": "The Azure blob storage account key.",
                 "airbyte_secret": true,
                 "examples": [
-                  "Z8ZkZpteggFx394vm+PJHnGTvdRncaYS+JhLKdj789YNmD+iyGTnG+PV+POiuYNhBg/ACS+LKjd%4FG3FHGN12Nd=="
+                  "example"
+                ],
+                "type": "string"
+              }
+            }
+          },
+          {
+            "title": "Authenticate via Service Principal Token",
+            "type": "object",
+            "required": ["auth_type"],
+            "properties": {
+              "auth_type": {
+                "title": "Auth Type",
+                "default": "Service Principal Token",
+                "const": "Service Principal Token",
+                "enum": ["Service Principal Token"],
+                "type": "string"
+              },
+              "tenant_id": {
+                "title": "Tenant Id",
+                "description": "The Azure Tenant Id.",
+                "airbyte_secret": true,
+                "examples": [
+                  "example"
+                ],
+                "type": "string"
+              },
+              "client_secret": {
+                "title": "Client Secret",
+                "description": "The Azure Client Secret.",
+                "airbyte_secret": true,
+                "examples": [
+                  "example"
+                ],
+                "type": "string"
+              },
+              "client_id": {
+                "title": "Client Id",
+                "description": "The Azure Client Id.",
+                "airbyte_secret": true,
+                "examples": [
+                  "example"
                 ],
                 "type": "string"
               }
