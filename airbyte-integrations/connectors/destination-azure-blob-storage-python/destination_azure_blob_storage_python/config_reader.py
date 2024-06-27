@@ -67,7 +67,7 @@ class ConnectorConfig:
             credentials: dict = None,
 
     ):
-        print("Test")
+
         self.storage_account_name = storage_account_name
         self.account_url = f"https://{self.storage_account_name}.blob.core.windows.net"
         self.container_name = container_name
@@ -76,13 +76,10 @@ class ConnectorConfig:
         print(self.credentials_type)
 
         if self.credentials_type == CredentialsType.SAS_TOKEN:
-            print("SAS")
             self.sas_token = self.credentials.get("sas_token")
         elif self.credentials_type == CredentialsType.STORAGE_ACCOUNT_KEY:
-            print("SA")
             self.storage_account_key = self.credentials.get("azure_blob_storage_account_key")
         elif self.credentials_type == CredentialsType.SERVICE_PRINCIPAL_TOKEN:
-            print("SPT")
             self.tenant_id = self.credentials.get("tenant_id")
             self.client_id = self.credentials.get("client_id")
             self.client_secret = self.credentials.get("client_secret")
