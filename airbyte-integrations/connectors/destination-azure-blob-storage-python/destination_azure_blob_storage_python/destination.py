@@ -3,20 +3,25 @@
 #
 
 
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Dict
 import random, string
 
 from airbyte_cdk import AirbyteLogger
 from airbyte_cdk.destinations import Destination
-from airbyte_cdk.models import AirbyteConnectionStatus, AirbyteMessage, ConfiguredAirbyteCatalog, Status, Type
+from airbyte_cdk.models import AirbyteConnectionStatus, AirbyteMessage, AirbyteStateType, ConfiguredAirbyteCatalog, Status, Type
 from azure.core.exceptions import ClientAuthenticationError
 
 from .azure import AzureHandler
 from .config_reader import ConnectorConfig
 from .stream_writer import StreamWriter
 
+# Flush records every 25000 records to limit memory consumption
+RECORD_FLUSH_INTERVAL = 25000
 
 class DestinationAzureBlobStoragePython(Destination):
+    def _flush_streams(self, streams: Dict[str, StreamWriter]) -> None:
+        for stream in streams:
+            streams[stream].flush()
     @staticmethod
     def _get_random_string(length: int) -> str:
         return "".join(random.choice(string.ascii_letters) for i in range(length))
@@ -89,7 +94,7 @@ class DestinationAzureBlobStoragePython(Destination):
 
                 # Flush records every RECORD_FLUSH_INTERVAL records to limit memory consumption
                 # Records will either get flushed when a state message is received or when hitting the RECORD_FLUSH_INTERVAL
-                if len(streams[stream]._messages) > 1:
+                if len(streams[stream]._messages) > RECORD_FLUSH_INTERVAL:
                     print(f"Reached size limit: flushing records for {stream}")
                     streams[stream].flush(partial=True)
                     print(streams[stream]._table)

@@ -24,7 +24,6 @@ class AzureHandler:
         self._client: ContainerClient = None
         self._destination: Destination = destination
         self._blob_client: BlobClient = None
-        self._stream_name: StreamName = None
 
         self.create_client()
 

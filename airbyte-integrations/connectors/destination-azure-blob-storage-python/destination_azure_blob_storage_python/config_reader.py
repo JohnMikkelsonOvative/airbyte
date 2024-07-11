@@ -65,13 +65,14 @@ class ConnectorConfig:
             storage_account_name: str = None,
             container_name: str = None,
             credentials: dict = None,
-
+            partitioning: str = None,
     ):
         self.storage_account_name = storage_account_name
         self.account_url = f"https://{self.storage_account_name}.blob.core.windows.net"
         self.container_name = container_name
         self.credentials = credentials
         self.credentials_type = CredentialsType.from_string(credentials.get("auth_type"))
+        self.partitioning = PartitionOptions.from_string(partitioning)
         print(self.credentials_type)
 
         if self.credentials_type == CredentialsType.SAS_TOKEN:

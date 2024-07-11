@@ -9,8 +9,6 @@ from decimal import Decimal, getcontext
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 from airbyte_cdk.models import ConfiguredAirbyteStream, DestinationSyncMode
 
 from .azure import AzureHandler
