@@ -1,8 +1,3 @@
-#
-# Copyright (c) 2024 Airbyte, Inc., all rights reserved.
-#
-
-
 from typing import Any, Iterable, Mapping, Dict
 import random, string
 
