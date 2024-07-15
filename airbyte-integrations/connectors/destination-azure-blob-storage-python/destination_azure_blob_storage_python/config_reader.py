@@ -4,6 +4,7 @@ import enum
 class CredentialsType(enum.Enum):
     SAS_TOKEN = "SAS Token"
     STORAGE_ACCOUNT_KEY = "Storage Account Key"
+    SERVICE_PRINCIPAL_TOKEN = "Service Principal Token"
 
     @staticmethod
     def from_string(s: str):
@@ -11,6 +12,8 @@ class CredentialsType(enum.Enum):
             return CredentialsType.SAS_TOKEN
         elif s == "Storage Account Key":
             return CredentialsType.STORAGE_ACCOUNT_KEY
+        elif s == "Service Principal Token":
+            return CredentialsType.SERVICE_PRINCIPAL_TOKEN
         else:
             raise ValueError(f"Unknown auth mode: {s}")
 
@@ -62,6 +65,7 @@ class ConnectorConfig:
             storage_account_name: str = None,
             container_name: str = None,
             credentials: dict = None,
+            partitioning: str = None,
 
     ):
         self.storage_account_name = storage_account_name
@@ -69,11 +73,17 @@ class ConnectorConfig:
         self.container_name = container_name
         self.credentials = credentials
         self.credentials_type = CredentialsType.from_string(credentials.get("auth_type"))
+        self.partitioning = PartitionOptions.from_string(partitioning)
+        print(self.credentials_type)
 
         if self.credentials_type == CredentialsType.SAS_TOKEN:
             self.sas_token = self.credentials.get("sas_token")
-        if self.credentials_type == CredentialsType.STORAGE_ACCOUNT_KEY:
+        elif self.credentials_type == CredentialsType.STORAGE_ACCOUNT_KEY:
             self.storage_account_key = self.credentials.get("azure_blob_storage_account_key")
+        elif self.credentials_type == CredentialsType.SERVICE_PRINCIPAL_TOKEN:
+            self.tenant_id = self.credentials.get("tenant_id")
+            self.client_id = self.credentials.get("client_id")
+            self.client_secret = self.credentials.get("client_secret")
         else:
             raise Exception("Auth Mode not recognized.")
 

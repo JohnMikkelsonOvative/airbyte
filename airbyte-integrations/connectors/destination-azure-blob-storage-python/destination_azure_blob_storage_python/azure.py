@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from azure.storage.blob import ContainerClient, BlobClient, BlobProperties
+from azure.identity import ClientSecretCredential
 from airbyte_cdk.destinations import Destination
 from retrying import retry
 
@@ -23,13 +24,15 @@ class AzureHandler:
         self._client: ContainerClient = None
         self._destination: Destination = destination
         self._blob_client: BlobClient = None
-        self._stream_name: StreamName = None
 
         self.create_client()
 
     @retry(stop_max_attempt_number=10, wait_random_min=1000)
     def create_client(self) -> None:
+        client_credential: str | ClientSecretCredential
+
         if self._config.credentials_type == CredentialsType.SAS_TOKEN:
+            client_credential = self._config.sas_token
             self._client = ContainerClient(
                 # The value can be:
                 # - a SAS token string
@@ -41,6 +44,10 @@ class AzureHandler:
                 container_name=self._config.container_name,
             )
         elif self._config.credentials_type == CredentialsType.STORAGE_ACCOUNT_KEY:
+            client_credential = self._config.storage_account_key
+        elif self._config.credentials_type == CredentialsType.SERVICE_PRINCIPAL_TOKEN:
+            client_credential = ClientSecretCredential(tenant_id=self._config.tenant_id, client_id=self._config.client_id,
+                                                       client_secret=self._config.client_secret)
             self._client = ContainerClient(
                 account_url=self._config.account_url,
                 credential=self._config.storage_account_key,
