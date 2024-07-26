@@ -4,8 +4,6 @@ from datetime import date, datetime
 from decimal import Decimal, getcontext
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import re
-
 import pandas as pd
 from airbyte_cdk.models import ConfiguredAirbyteStream, DestinationSyncMode
 
@@ -17,7 +15,6 @@ from .constants import EMPTY_VALUES, TYPE_MAPPING_DOUBLE, PANDAS_TYPE_MAPPING
 # this setting matches that precision.
 getcontext().prec = 25
 logger = logging.getLogger("airbyte")
-RE_INT = re.compile(r'^[-+]?[0-9]+$')
 
 
 class DictEncoder(json.JSONEncoder):

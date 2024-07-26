@@ -146,10 +146,3 @@ class DestinationAzureBlobStoragePython(Destination):
 
 
         return AirbyteConnectionStatus(status=Status.SUCCEEDED)
-
-
-def get_all_keys(d):
-    for key, value in d.items():
-        yield key
-        if isinstance(value, dict):
-            yield from get_all_keys(value)
