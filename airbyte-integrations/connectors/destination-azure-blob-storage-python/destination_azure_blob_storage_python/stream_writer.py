@@ -4,6 +4,8 @@ from datetime import date, datetime
 from decimal import Decimal, getcontext
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import re
+
 import pandas as pd
 from airbyte_cdk.models import ConfiguredAirbyteStream, DestinationSyncMode
 
@@ -15,6 +17,7 @@ from .constants import EMPTY_VALUES, TYPE_MAPPING_DOUBLE, PANDAS_TYPE_MAPPING
 # this setting matches that precision.
 getcontext().prec = 25
 logger = logging.getLogger("airbyte")
+RE_INT = re.compile(r'^[-+]?[0-9]+$')
 
 
 class DictEncoder(json.JSONEncoder):
@@ -56,7 +59,7 @@ class StreamWriter:
             if isinstance(typ, str) and typ == "string":
                 if val.get("format") in ["date-time", "date"]:
                     date_columns.append(key)
-
+        print("date column", date_columns)
         return date_columns
 
     def _add_partition_column(self, col: str, df: pd.DataFrame) -> Dict[str, str]:
@@ -125,8 +128,6 @@ class StreamWriter:
             return pd.to_numeric(value, errors="coerce")
 
         elif typ == "number":
-            #if self._config.glue_catalog_float_as_decimal:
-            #    return Decimal(str(value)) if value else Decimal("0")
             return pd.to_numeric(value, errors="coerce")
 
         elif typ == "boolean":
@@ -198,18 +199,32 @@ class StreamWriter:
 
     def _get_pandas_dtypes_from_json_schema(self, df: pd.DataFrame) -> Dict[str, str]:
         column_types = {}
-
         typ = "string"
-        for col in df.columns:
-            if col in self._schema:
-                typ = self._schema[col].get("type", "string")
-                airbyte_type = self._schema[col].get("airbyte_type")
 
-                # special case where the json schema type contradicts the airbyte type
-                if airbyte_type and typ == "number" and airbyte_type == "integer":
-                    typ = "integer"
+        for col, definition in self._schema.items():
+            typ = definition.get("type")
+            airbyte_type = definition.get("airbyte_type")
+            col_format = definition.get("format")
+            typ = self._get_json_schema_type(typ)
 
-                typ = self._get_json_schema_type(typ)
+            # special case where the json schema type contradicts the airbyte type
+            if airbyte_type and typ == "number" and airbyte_type == "integer":
+                typ = "integer"
+
+            if typ == "string" and col_format == "date-time":
+                typ = "string"
+
+            if typ == "string" and col_format == "date":
+                typ = "string"
+
+            if typ == "object":
+                typ = "string"
+
+            if typ == "array":
+                typ = "string"
+
+            if typ is None:
+                typ = "string"
 
             column_types[col] = PANDAS_TYPE_MAPPING.get(typ, "string")
 
@@ -223,63 +238,11 @@ class StreamWriter:
 
         return types
 
-    def _is_invalid_struct_or_array(self, schema: Dict[str, Any]) -> bool:
-        """
-        Helper that detects issues with nested objects/arrays in the json schema.
-        When a complex data type is detected (schema with oneOf) or a nested object without properties
-        the columns' dtype will be casted to string to avoid pyarrow conversion issues.
-        """
-        result = True
-
-        def check_properties(schema):
-            nonlocal result
-            for val in schema.values():
-                # Complex types can't be casted to an athena/glue type
-                if val.get("oneOf"):
-                    result = False
-                    continue
-
-                raw_typ = val.get("type")
-
-                # If the type is a list, check for mixed types
-                # complex objects with mixed types can't be reliably casted
-                if isinstance(raw_typ, list) and self._json_schema_type_has_mixed_types(raw_typ):
-                    result = False
-                    continue
-
-                typ = self._get_json_schema_type(raw_typ)
-
-                # If object check nested properties
-                if typ == "object":
-                    properties = val.get("properties")
-                    if not properties:
-                        result = False
-                    else:
-                        check_properties(properties)
-
-                # If array check nested properties
-                if typ == "array":
-                    items = val.get("items")
-
-                    if not items:
-                        result = False
-                        continue
-
-                    if isinstance(items, list):
-                        items = items[0]
-
-                    item_properties = items.get("properties")
-                    if item_properties:
-                        check_properties(item_properties)
-
-        check_properties(schema)
-        return result
-
     def get_dtypes_from_json_schema(self, schema: Dict[str, Any]) -> Tuple[Dict[str, str], List[str]]:
         """
         Helper that infers glue dtypes from a json schema.
         """
-        type_mapper = TYPE_MAPPING_DOUBLE #if self._config.glue_catalog_float_as_decimal else GLUE_TYPE_MAPPING_DOUBLE
+        type_mapper = PANDAS_TYPE_MAPPING #if self._config.glue_catalog_float_as_decimal else GLUE_TYPE_MAPPING_DOUBLE
 
         column_types = {}
         json_columns = set()
@@ -296,60 +259,17 @@ class StreamWriter:
                 col_typ = "integer"
 
             if col_typ == "string" and col_format == "date-time":
-                result_typ = "timestamp"
+                result_typ = "datetime"
 
             if col_typ == "string" and col_format == "date":
-                result_typ = "date"
+                result_typ = "datetime"
 
             if col_typ == "object":
-                properties = definition.get("properties")
-                allow_additional_properties = definition.get("additionalProperties", False)
-                if properties and not allow_additional_properties and self._is_invalid_struct_or_array(properties):
-                    object_props, _ = self.get_dtypes_from_json_schema(properties)
-                    result_typ = f"struct<{','.join([f'{k}:{v}' for k, v in object_props.items()])}>"
-                else:
-                    json_columns.add(col)
-                    result_typ = "string"
+                json_columns.add(col)
+                result_typ = "string"
 
             if col_typ == "array":
-                items = definition.get("items", {})
-
-                if isinstance(items, list):
-                    items = items[0]
-
-                raw_item_type = items.get("type")
-                airbyte_raw_item_type = items.get("airbyte_type")
-
-                # special case where the json schema type contradicts the airbyte type
-                if airbyte_raw_item_type and raw_item_type == "number" and airbyte_raw_item_type == "integer":
-                    raw_item_type = "integer"
-
-                item_type = self._get_json_schema_type(raw_item_type)
-                item_properties = items.get("properties")
-
-                # if array has no "items", cast to string
-                if not items:
-                    json_columns.add(col)
-                    result_typ = "string"
-
-                # if array with objects
-                elif isinstance(items, dict) and item_properties:
-                    # Check if nested object has properties and no mixed type objects
-                    if self._is_invalid_struct_or_array(item_properties):
-                        item_dtypes, _ = self.get_dtypes_from_json_schema(item_properties)
-                        inner_struct = f"struct<{','.join([f'{k}:{v}' for k, v in item_dtypes.items()])}>"
-                        result_typ = f"array<{inner_struct}>"
-                    else:
-                        json_columns.add(col)
-                        result_typ = "string"
-
-                elif item_type and self._json_schema_type_has_mixed_types(raw_item_type):
-                    json_columns.add(col)
-                    result_typ = "string"
-
-                # array with single type
-                elif item_type and not self._json_schema_type_has_mixed_types(raw_item_type):
-                    result_typ = f"array<{type_mapper[item_type]}>"
+                result_typ = "string"
 
             if result_typ is None:
                 result_typ = type_mapper.get(col_typ, "string")
@@ -371,8 +291,17 @@ class StreamWriter:
         logger.debug(f"Flushing {len(self._messages)} messages")
 
         df = pd.DataFrame(self._messages)
+
+
+        print("flushing # of records: ", len(df.index))
         # best effort to convert pandas types
-        df = df.astype(self._get_pandas_dtypes_from_json_schema(df), errors="ignore")
+
+        column_types = self._get_pandas_dtypes_from_json_schema(df)
+
+        for col in column_types:
+            if col in df.columns:
+                df[col] = df[col].astype(column_types[col])
+        #df = df.astype(, errors="ignore")
 
         if len(df) < 1:
             logger.info(f"No messages to write")
@@ -382,24 +311,34 @@ class StreamWriter:
         date_columns = self._get_date_columns()
         for col in date_columns:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col], format="mixed", utc=True)
+                #df[col] = pd.to_datetime(df[col], format="mixed", utc=True)
 
                 # Create date column for partitioning
                 if self._cursor_fields and col in self._cursor_fields:
                     fields = self._add_partition_column(col, df)
                     partition_fields.update(fields)
 
-        dtype, json_casts = self.get_dtypes_from_json_schema(self._schema)
-        dtype = {**dtype, **partition_fields}
-        partition_fields = list(partition_fields.keys())
+        #dtype, json_casts = self.get_dtypes_from_json_schema(self._schema)
+        #dtype = {**dtype, **partition_fields}
+        #partition_fields = list(partition_fields.keys())
+        #print("datatype", dtype)
 
         # Make sure complex types that can't be converted
         # to a struct or array are converted to a json string
         # so they can be queried with json_extract
-        for col in json_casts:
-            if col in df.columns:
-                df[col] = df[col].apply(lambda x: json.dumps(x, cls=DictEncoder))
+        #for col in json_casts:
+        #    if col in df.columns:
+        #        df[col] = df[col].apply(lambda x: json.dumps(x, cls=DictEncoder))
 
+
+
+        #print(df.dtypes)
+        for col in range(len(df.columns)):
+            column = df.columns[col]
+            if column[0].isdigit():
+                df.rename(columns={column: "n" + column}, inplace=True)
+
+        #print(df.columns)
 
         self._azure_handler.write_parquet(df, self._table)
 

@@ -55,10 +55,19 @@ class DestinationAzureBlobStoragePython(Destination):
         }
 
 
+        #for s in streams:
+            #print(streams[s]._schema)
+        #    for col in [x for x in get_all_keys(streams[s]._schema)]:
+        #        print(col)
+        #        if col[0].isdigit():
+        #            newCol = "n" + col
+        #            streams[s]._schema[newCol] = streams[s]._schema[col]
+        #            del streams[s]._schema[col]
 
-
+        #print(streams[s]._schema)
 
         for message in input_messages:
+            #print(message)
 
             if message.type == Type.STATE and message.state.type == AirbyteStateType.STREAM:
                 state_stream = message.state.stream
@@ -90,6 +99,7 @@ class DestinationAzureBlobStoragePython(Destination):
                 # Flush records every RECORD_FLUSH_INTERVAL records to limit memory consumption
                 # Records will either get flushed when a state message is received or when hitting the RECORD_FLUSH_INTERVAL
                 if len(streams[stream]._messages) > RECORD_FLUSH_INTERVAL:
+                    print("RECORDS", len(streams[stream]._messages))
                     print(f"Reached size limit: flushing records for {stream}")
                     streams[stream].flush(partial=True)
                     print(streams[stream]._table)
@@ -136,3 +146,10 @@ class DestinationAzureBlobStoragePython(Destination):
 
 
         return AirbyteConnectionStatus(status=Status.SUCCEEDED)
+
+
+def get_all_keys(d):
+    for key, value in d.items():
+        yield key
+        if isinstance(value, dict):
+            yield from get_all_keys(value)

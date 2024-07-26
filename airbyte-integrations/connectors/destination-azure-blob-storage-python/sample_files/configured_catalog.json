@@ -10,10 +10,11 @@
         "json_schema": {
           "type": "object",
           "properties": {
-            "id": {
-              "type": "string"
+            "action_values": {
+              "description": "Action values taken on the ad",
+              "$ref": "ads_action_stats.json"
             },
-            "body": {
+            "2body": {
               "type": "string"
             },
             "attributes": {

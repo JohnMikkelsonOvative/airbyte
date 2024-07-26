@@ -2,7 +2,7 @@ data:
   connectorSubtype: file
   connectorType: destination
   definitionId: 9384da68-c49b-46af-83fd-b73b45442fff
-  dockerImageTag: 0.1.13
+  dockerImageTag: 0.1.35
   dockerRepository: us-central1-docker.pkg.dev/airbyte-custom-connectors/ovative/airbyte-destination-azure-blob-storage-python-dev
   githubIssueLabel: destination-azure-blob-storage-python
   icon: icon.svg

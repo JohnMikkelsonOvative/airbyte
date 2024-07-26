@@ -5,5 +5,6 @@ WORKDIR /airbyte/integration_code
 RUN pip install poetry
 RUN poetry install -C ./airbyte/integration_code
 
-ENV AIRBYTE_ENTRYPOINT ["poetry run -q -C /airbyte/integration_code/ python /airbyte/integration_code/main.py"]
+
+ENV AIRBYTE_ENTRYPOINT "python /airbyte/integration_code/main.py"
 ENTRYPOINT ["python", "/airbyte/integration_code/main.py"]

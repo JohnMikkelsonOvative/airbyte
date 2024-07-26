@@ -12,6 +12,8 @@ PANDAS_TYPE_MAPPING = {
     "boolean": "bool",
     "object": "object",
     "array": "object",
+    "date": "datetime",
+    "date-time": "datetime"
 }
 
 TYPE_MAPPING_DOUBLE = {
