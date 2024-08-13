@@ -9,7 +9,7 @@ from airbyte_cdk.models import ConfiguredAirbyteStream, DestinationSyncMode
 
 from .azure import AzureHandler
 from .config_reader import ConnectorConfig, PartitionOptions
-from .constants import EMPTY_VALUES, TYPE_MAPPING_DOUBLE, PANDAS_TYPE_MAPPING
+from .constants import EMPTY_VALUES
 
 # By default we set glue decimal type to decimal(28,25)
 # this setting matches that precision.
@@ -194,87 +194,6 @@ class StreamWriter:
 
         return types[0]
 
-    def _get_pandas_dtypes_from_json_schema(self, df: pd.DataFrame) -> Dict[str, str]:
-        column_types = {}
-        typ = "string"
-
-        for col, definition in self._schema.items():
-            typ = definition.get("type")
-            airbyte_type = definition.get("airbyte_type")
-            col_format = definition.get("format")
-            typ = self._get_json_schema_type(typ)
-
-            # special case where the json schema type contradicts the airbyte type
-            if airbyte_type and typ == "number" and airbyte_type == "integer":
-                typ = "integer"
-
-            if typ == "string" and col_format == "date-time":
-                typ = "string"
-
-            if typ == "string" and col_format == "date":
-                typ = "string"
-
-            if typ == "object":
-                typ = "string"
-
-            if typ == "array":
-                typ = "string"
-
-            if typ is None:
-                typ = "string"
-
-            column_types[col] = PANDAS_TYPE_MAPPING.get(typ, "string")
-
-        return column_types
-
-    def _get_json_schema_types(self) -> Dict[str, str]:
-        types = {}
-        for key, val in self._schema.items():
-            typ = val.get("type")
-            types[key] = self._get_json_schema_type(typ)
-
-        return types
-
-    def get_dtypes_from_json_schema(self, schema: Dict[str, Any]) -> Tuple[Dict[str, str], List[str]]:
-        """
-        Helper that infers glue dtypes from a json schema.
-        """
-        type_mapper = PANDAS_TYPE_MAPPING #if self._config.glue_catalog_float_as_decimal else GLUE_TYPE_MAPPING_DOUBLE
-
-        column_types = {}
-        json_columns = set()
-        for col, definition in schema.items():
-            result_typ = None
-            col_typ = definition.get("type")
-            airbyte_type = definition.get("airbyte_type")
-            col_format = definition.get("format")
-
-            col_typ = self._get_json_schema_type(col_typ)
-
-            # special case where the json schema type contradicts the airbyte type
-            if airbyte_type and col_typ == "number" and airbyte_type == "integer":
-                col_typ = "integer"
-
-            if col_typ == "string" and col_format == "date-time":
-                result_typ = "datetime"
-
-            if col_typ == "string" and col_format == "date":
-                result_typ = "datetime"
-
-            if col_typ == "object":
-                json_columns.add(col)
-                result_typ = "string"
-
-            if col_typ == "array":
-                result_typ = "string"
-
-            if result_typ is None:
-                result_typ = type_mapper.get(col_typ, "string")
-
-            column_types[col] = result_typ
-
-        return column_types, json_columns
-
     @property
     def _cursor_fields(self) -> Optional[List[str]]:
         return self._configured_stream.cursor_field
@@ -286,6 +205,10 @@ class StreamWriter:
 
     def flush(self, partial: bool = False):
         logger.debug(f"Flushing {len(self._messages)} messages")
+        #Pickle files for debugging
+        #self._azure_handler.write_messages_to_pickle(self._messages, self._table)
+
+        #self._azure_handler.write_messages_to_pickle(self._schema, "schema")
 
         df = pd.DataFrame(self._messages)
 
@@ -293,51 +216,38 @@ class StreamWriter:
         print("flushing # of records: ", len(df.index))
         # best effort to convert pandas types
 
-        column_types = self._get_pandas_dtypes_from_json_schema(df)
-
-        for col in column_types:
-            if col in df.columns:
-                df[col] = df[col].astype(column_types[col])
-        #df = df.astype(, errors="ignore")
-
         if len(df) < 1:
             logger.info(f"No messages to write")
             return
 
-        partition_fields = {}
-        date_columns = self._get_date_columns()
-        for col in date_columns:
-            if col in df.columns:
+        #partition_fields = {}
+        #date_columns = self._get_date_columns()
+        #for col in date_columns:
+        #    if col in df.columns:
                 #df[col] = pd.to_datetime(df[col], format="mixed", utc=True)
 
                 # Create date column for partitioning
-                if self._cursor_fields and col in self._cursor_fields:
-                    fields = self._add_partition_column(col, df)
-                    partition_fields.update(fields)
+         #       if self._cursor_fields and col in self._cursor_fields:
+         #           fields = self._add_partition_column(col, df)
+         #           partition_fields.update(fields)
 
         #dtype, json_casts = self.get_dtypes_from_json_schema(self._schema)
         #dtype = {**dtype, **partition_fields}
         #partition_fields = list(partition_fields.keys())
         #print("datatype", dtype)
 
-        # Make sure complex types that can't be converted
-        # to a struct or array are converted to a json string
-        # so they can be queried with json_extract
-        #for col in json_casts:
-        #    if col in df.columns:
-        #        df[col] = df[col].apply(lambda x: json.dumps(x, cls=DictEncoder))
 
-
-
-        #print(df.dtypes)
         for col in range(len(df.columns)):
             column = df.columns[col]
             if column[0].isdigit():
                 df.rename(columns={column: "n" + column}, inplace=True)
 
-        #print(df.columns)
+        # print(self._config.file_type)
+        # if self._config.file_type.get("format_type") == "avro":
+        #     self._azure_handler.write_avro(df, self._table, self._schema)
 
-        self._azure_handler.write_parquet(df, self._table)
+        if self._config.file_type.get("format_type") == "parquet":
+            self._azure_handler.write_parquet(self._messages, self._table, self._schema)
 
         if partial:
             self._partial_flush_count += 1

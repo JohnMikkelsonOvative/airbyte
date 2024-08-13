@@ -27,11 +27,56 @@
         "type": "string",
         "order": 2
       },
+      "path_name": {
+        "title": "Path Name",
+        "description": "The path of the Azure blob container folder.",
+        "type": "string",
+        "order": 3
+      },
+      "file_type": {
+        "title": "Output Format",
+        "type": "object",
+        "description": "Output data format",
+        "oneOf": [
+          {
+            "title": "Avro",
+            "required": ["format_type"],
+            "properties": {
+              "format_type": {
+                "type": "string",
+                "const": "avro"
+              },
+              "file_extension": {
+                "title": "File Extension",
+                "type": "boolean",
+                "default": false,
+                "description": "Add file extensions to the output file."
+              }
+            }
+          },
+          {
+            "title": "Parquet",
+            "required": ["format_type"],
+            "properties": {
+              "format_type": {
+                "type": "string",
+                "const": "parquet"
+              },
+              "file_extension": {
+                "title": "File Extension",
+                "type": "boolean",
+                "default": false,
+                "description": "Add file extensions to the output file."
+              }
+            }
+          }
+        ]
+      },
       "credentials": {
         "title": "Authentication",
         "description": "Credentials for connecting to Azure Blob Storage",
         "type": "object",
-        "order": 3,
+        "order": 4,
         "oneOf": [
           {
             "title": "Authenticate via Storage Account Key",

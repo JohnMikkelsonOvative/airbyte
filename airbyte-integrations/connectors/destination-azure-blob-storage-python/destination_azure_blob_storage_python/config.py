@@ -74,6 +74,20 @@ class Config(AbstractFileBasedSpec):
         examples=["airbytetescontainername"],
         order=4,
     )
+
+    azure_blob_storage_path_name: str = Field(
+        title="Azure blob storage container path",
+        description="The container path where the blob will be stored.",
+        examples=["airbytetescontainername"],
+        order=5,
+    )
+
+    azure_blob_storage_file_type: str = Field(
+        title="Azure blob storage file type",
+        description="Avro/Parquet/CSV",
+        examples=["airbytetescontainername"],
+        order=6,
+    )
     azure_blob_storage_endpoint: Optional[str] = Field(
         title="Endpoint Domain Name",
         description="This is Azure Blob Storage endpoint domain name. Leave default value (or leave it empty if run container from "
