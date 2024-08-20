@@ -48,51 +48,6 @@ class StreamWriter:
 
         logger.info(f"Creating StreamWriter")
 
-    def _get_date_columns(self) -> List[str]:
-        date_columns = []
-        for key, val in self._schema.items():
-            typ = val.get("type")
-            typ = self._get_json_schema_type(typ)
-            if isinstance(typ, str) and typ == "string":
-                if val.get("format") in ["date-time", "date"]:
-                    date_columns.append(key)
-        print("date column", date_columns)
-        return date_columns
-
-    def _add_partition_column(self, col: str, df: pd.DataFrame) -> Dict[str, str]:
-        partitioning = self._config.partitioning
-
-        if partitioning == PartitionOptions.NONE:
-            return {}
-
-        partitions = partitioning.value.split("/")
-
-        fields = {}
-        for partition in partitions:
-            date_col = f"{col}_{partition.lower()}"
-            fields[date_col] = "bigint"
-
-            # defaulting to 0 since both governed tables
-            # and pyarrow don't play well with __HIVE_DEFAULT_PARTITION__
-            # - pyarrow will fail to cast the column to any other type than string
-            # - governed tables will fail when trying to query a table with partitions that have __HIVE_DEFAULT_PARTITION__
-            # aside from the above, awswrangler will remove data from a table if the partition value is null
-            # see: https://github.com/aws/aws-sdk-pandas/issues/921
-            if partition == "YEAR":
-                df[date_col] = df[col].dt.strftime("%Y").fillna("0").astype("Int64")
-
-            elif partition == "MONTH":
-                df[date_col] = df[col].dt.strftime("%m").fillna("0").astype("Int64")
-
-            elif partition == "DAY":
-                df[date_col] = df[col].dt.strftime("%d").fillna("0").astype("Int64")
-
-            elif partition == "DATE":
-                fields[date_col] = "date"
-                df[date_col] = df[col].dt.strftime("%Y-%m-%d")
-
-        return fields
-
     def _drop_additional_top_level_properties(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """
         Helper that removes any unexpected top-level properties from the record.
@@ -205,46 +160,10 @@ class StreamWriter:
 
     def flush(self, partial: bool = False):
         logger.debug(f"Flushing {len(self._messages)} messages")
-        #Pickle files for debugging
-        #self._azure_handler.write_messages_to_pickle(self._messages, self._table)
 
-        #self._azure_handler.write_messages_to_pickle(self._schema, "schema")
-
-        df = pd.DataFrame(self._messages)
-
-
-        print("flushing # of records: ", len(df.index))
-        # best effort to convert pandas types
-
-        if len(df) < 1:
+        if len(self._messages) < 1:
             logger.info(f"No messages to write")
             return
-
-        #partition_fields = {}
-        #date_columns = self._get_date_columns()
-        #for col in date_columns:
-        #    if col in df.columns:
-                #df[col] = pd.to_datetime(df[col], format="mixed", utc=True)
-
-                # Create date column for partitioning
-         #       if self._cursor_fields and col in self._cursor_fields:
-         #           fields = self._add_partition_column(col, df)
-         #           partition_fields.update(fields)
-
-        #dtype, json_casts = self.get_dtypes_from_json_schema(self._schema)
-        #dtype = {**dtype, **partition_fields}
-        #partition_fields = list(partition_fields.keys())
-        #print("datatype", dtype)
-
-
-        for col in range(len(df.columns)):
-            column = df.columns[col]
-            if column[0].isdigit():
-                df.rename(columns={column: "n" + column}, inplace=True)
-
-        # print(self._config.file_type)
-        # if self._config.file_type.get("format_type") == "avro":
-        #     self._azure_handler.write_avro(df, self._table, self._schema)
 
         if self._config.file_type.get("format_type") == "parquet":
             self._azure_handler.write_parquet(self._messages, self._table, self._schema)
@@ -252,5 +171,4 @@ class StreamWriter:
         if partial:
             self._partial_flush_count += 1
 
-        del df
         self._messages.clear()
