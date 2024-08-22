@@ -205,52 +205,26 @@ class StreamWriter:
 
     def flush(self, partial: bool = False):
         logger.debug(f"Flushing {len(self._messages)} messages")
-        #Pickle files for debugging
-        #self._azure_handler.write_messages_to_pickle(self._messages, self._table)
 
-        #self._azure_handler.write_messages_to_pickle(self._schema, "schema")
-
-        df = pd.DataFrame(self._messages)
-
-
-        print("flushing # of records: ", len(df.index))
+        print("flushing # of records: ", len(self._messages))
         # best effort to convert pandas types
 
-        if len(df) < 1:
+        if len(self._messages) < 1:
             logger.info(f"No messages to write")
             return
 
-        #partition_fields = {}
-        #date_columns = self._get_date_columns()
-        #for col in date_columns:
-        #    if col in df.columns:
-                #df[col] = pd.to_datetime(df[col], format="mixed", utc=True)
+        print(self._config.file_type)
+        format_type = self._config.file_type.get("format_type")
+        flattening = self._config.file_type.get("flattening")
+        file_extension = self._config.file_type.get("file_extension")
 
-                # Create date column for partitioning
-         #       if self._cursor_fields and col in self._cursor_fields:
-         #           fields = self._add_partition_column(col, df)
-         #           partition_fields.update(fields)
+        if format_type == "parquet":
+            self._azure_handler.write_parquet(self._messages, self._table, self._schema, file_extension)
 
-        #dtype, json_casts = self.get_dtypes_from_json_schema(self._schema)
-        #dtype = {**dtype, **partition_fields}
-        #partition_fields = list(partition_fields.keys())
-        #print("datatype", dtype)
-
-
-        for col in range(len(df.columns)):
-            column = df.columns[col]
-            if column[0].isdigit():
-                df.rename(columns={column: "n" + column}, inplace=True)
-
-        # print(self._config.file_type)
-        # if self._config.file_type.get("format_type") == "avro":
-        #     self._azure_handler.write_avro(df, self._table, self._schema)
-
-        if self._config.file_type.get("format_type") == "parquet":
-            self._azure_handler.write_parquet(self._messages, self._table, self._schema)
+        if format_type == "csv":
+            self._azure_handler.write_csv(self._messages, self._table, flattening, file_extension)
 
         if partial:
             self._partial_flush_count += 1
 
-        del df
         self._messages.clear()
