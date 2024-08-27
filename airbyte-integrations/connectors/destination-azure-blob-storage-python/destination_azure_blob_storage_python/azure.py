@@ -1,4 +1,5 @@
 import logging
+import math
 from typing import Any, Dict, List, Optional
 
 import fastavro
@@ -15,7 +16,10 @@ from fastavro import writer, parse_schema, reader
 from io import BytesIO
 import datetime
 import json
-import pickle
+import avro.schema
+import avro.io
+import avro.datafile
+import io
 
 
 from time import time
@@ -23,7 +27,6 @@ from time import time
 from .config_reader import ConnectorConfig, CredentialsType, OutputFormat
 
 logger = logging.getLogger("airbyte")
-
 
 class AzureHandler:
     def __init__(self, connector_config: ConnectorConfig, destination: Destination) -> None:
@@ -111,7 +114,7 @@ class AzureHandler:
 
         #build path
         path_name = ""
-        if self._config.path_name is not "":
+        if self._config.path_name != "":
             path_name = path_name + self._config.path_name + "/"
 
         if stream_name:
@@ -144,7 +147,7 @@ class AzureHandler:
 
         #build path
         path_name = ""
-        if self._config.path_name is not "":
+        if self._config.path_name != "":
             path_name = path_name + self._config.path_name + "/"
 
         if stream_name:
@@ -159,3 +162,140 @@ class AzureHandler:
             name = name + ".csv"
         #uploads blob with name to the container
         self._client.upload_blob(path_name + name, buf.getvalue().to_pybytes(), overwrite=True)
+
+    def write_avro(self, messages, stream_name, stream_schema, file_extension):
+        array_cols = []
+        for col, definition in stream_schema.items():
+            col_typ = definition.get("type")
+
+            if "array" in col_typ:
+                array_cols.append(col)
+
+        for i, full_row in enumerate(messages):
+            for column in full_row.keys():
+                if column in array_cols:
+                    list_string = []
+                    if full_row[column] is not None:
+                        for item in full_row[column]:
+                            json_string = str(item)
+                            list_string.append(json_string)
+                    messages[i][column] = list_string
+
+        def convert_nan_to_none(record):
+            # Convert None values to None in a single dictionary
+            return {key: (None if isinstance(value, float) and math.isnan(value) else value) for key, value in record.items()}
+
+        def convert_nan_to_none_in_list(records):
+            # Apply the conversion function to each dictionary in the list
+            return [convert_nan_to_none(record) for record in records]
+
+        converted_records = convert_nan_to_none_in_list(messages)
+
+        def remove_description_and_null_type(schema_data):
+            """ Recursively remove 'description' and 'null' type from the dictionary. """
+            if isinstance(schema_data, dict):
+                # Remove 'description' field if it exists
+                schema_data.pop('description', None)
+
+                # Process 'type' field
+                if 'type' in schema_data:
+                    types = schema_data['type']
+                    if isinstance(types, list):
+                        # Remove 'null' type if it exists
+                        schema_data['type'] = types[1]
+
+                # Recursively process nested dictionaries and lists
+                for key in schema_data:
+                    if isinstance(schema_data[key], dict):
+                        remove_description_and_null_type(schema_data[key])
+                    elif isinstance(schema_data[key], list):
+                        schema_data[key] = [remove_description_and_null_type(item) for item in schema_data[key]]
+
+            return schema_data
+
+        cleaned_dict = remove_description_and_null_type(stream_schema)
+
+        # Function to infer Avro schema from data with unique record names
+        def infer_avro_schema(data):
+
+            def infer_type(value, parent_name=""):
+                v = value.get("type")
+                if v == "integer":
+                    return "int"
+                elif "items" in value:
+                    return {"type": "array", "items": "string"}
+                elif v == "number":
+                    return "float"
+                elif v == "bool":
+                    return "boolean"
+                else:
+                    return "string"
+
+            fields = [{"name": k, "type": ["null", infer_type(v, parent_name=k)]} for k, v in data.items()]
+            schema = {
+                "type": "record",
+                "name": "schema",
+                "fields": fields
+            }
+            return schema
+
+        # Generate the schema from the schema data
+        schema_dict = infer_avro_schema(cleaned_dict)
+
+        # Convert schema to Avro schema object
+        schema_json = json.dumps(schema_dict)
+        schema_fields = [field['name'] for field in schema_dict['fields']]
+
+        def reorder_dict_by_schema(record, schema_order):
+            # Reorder the dictionary based on the schema order
+            ordered_record = {field: record[field] for field in schema_order if field in record}
+            return ordered_record
+
+        def reorder_list_of_dicts_by_schema(records, schema_order):
+            # Reorder each dictionary in the list according to the schema order
+            return [reorder_dict_by_schema(record, schema_order) for record in records]
+
+        ordered_records = reorder_list_of_dicts_by_schema(converted_records, schema_fields)
+
+        # Print the reordered list of dictionaries
+
+        schema = avro.schema.parse(schema_json)
+
+        path_name = ""
+        if self._config.path_name != "":
+            path_name = path_name + self._config.path_name + "/"
+
+        if stream_name:
+            path_name = path_name + stream_name + "/"
+
+        if self._stream_time:
+            path_name = path_name + self._stream_time + "/"
+
+        current_timestamp = int(time() * 1000)
+        name = str(current_timestamp)
+        if file_extension:
+            name = name + ".avro"
+
+        # Prepare the Avro file writer
+        avro_filename = 'output_data.avro'
+        with open(avro_filename, 'wb') as out_file:
+            writer = avro.io.DatumWriter(schema)
+            avro_writer = avro.datafile.DataFileWriter(out_file, writer, schema)
+
+            try:
+                # Write the data to the Avro file
+                for record in ordered_records:
+                    avro_writer.append(record)
+                print(f"Data successfully written to {avro_filename}")
+            except Exception as e:
+                print(f"Error writing data to Avro file: {e}")
+
+            # Close the writer
+            avro_writer.close()
+
+        # Upload the file
+        with open(avro_filename, 'rb') as data:
+            self._client.upload_blob(path_name + name, data, overwrite=True)
+
+
+
