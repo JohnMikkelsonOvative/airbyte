@@ -177,6 +177,9 @@ class StreamWriter:
         if format_type == "csv":
             self._azure_handler.write_csv(self._messages, self._table, flattening, file_extension)
 
+        if format_type == "avro":
+            self._azure_handler.write_avro(self._messages, self._table, self._schema, file_extension)
+
         if partial:
             self._partial_flush_count += 1
 

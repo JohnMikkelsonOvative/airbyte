@@ -76,6 +76,22 @@
                 "description": "Add file extensions to the output file."
               }
             }
+          },
+          {
+            "title": "Avro",
+            "required": ["format_type"],
+            "properties": {
+              "format_type": {
+                "type": "string",
+                "const": "avro"
+              },
+              "file_extension": {
+                "title": "File Extension",
+                "type": "boolean",
+                "default": false,
+                "description": "Add file extensions to the output file."
+              }
+            }
           }
         ]
       },
