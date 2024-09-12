@@ -48,51 +48,6 @@ class StreamWriter:
 
         logger.info(f"Creating StreamWriter")
 
-    def _get_date_columns(self) -> List[str]:
-        date_columns = []
-        for key, val in self._schema.items():
-            typ = val.get("type")
-            typ = self._get_json_schema_type(typ)
-            if isinstance(typ, str) and typ == "string":
-                if val.get("format") in ["date-time", "date"]:
-                    date_columns.append(key)
-        print("date column", date_columns)
-        return date_columns
-
-    def _add_partition_column(self, col: str, df: pd.DataFrame) -> Dict[str, str]:
-        partitioning = self._config.partitioning
-
-        if partitioning == PartitionOptions.NONE:
-            return {}
-
-        partitions = partitioning.value.split("/")
-
-        fields = {}
-        for partition in partitions:
-            date_col = f"{col}_{partition.lower()}"
-            fields[date_col] = "bigint"
-
-            # defaulting to 0 since both governed tables
-            # and pyarrow don't play well with __HIVE_DEFAULT_PARTITION__
-            # - pyarrow will fail to cast the column to any other type than string
-            # - governed tables will fail when trying to query a table with partitions that have __HIVE_DEFAULT_PARTITION__
-            # aside from the above, awswrangler will remove data from a table if the partition value is null
-            # see: https://github.com/aws/aws-sdk-pandas/issues/921
-            if partition == "YEAR":
-                df[date_col] = df[col].dt.strftime("%Y").fillna("0").astype("Int64")
-
-            elif partition == "MONTH":
-                df[date_col] = df[col].dt.strftime("%m").fillna("0").astype("Int64")
-
-            elif partition == "DAY":
-                df[date_col] = df[col].dt.strftime("%d").fillna("0").astype("Int64")
-
-            elif partition == "DATE":
-                fields[date_col] = "date"
-                df[date_col] = df[col].dt.strftime("%Y-%m-%d")
-
-        return fields
-
     def _drop_additional_top_level_properties(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """
         Helper that removes any unexpected top-level properties from the record.
@@ -207,13 +162,11 @@ class StreamWriter:
         logger.debug(f"Flushing {len(self._messages)} messages")
 
         print("flushing # of records: ", len(self._messages))
-        # best effort to convert pandas types
 
         if len(self._messages) < 1:
             logger.info(f"No messages to write")
             return
 
-        print(self._config.file_type)
         format_type = self._config.file_type.get("format_type")
         flattening = self._config.file_type.get("flattening")
         file_extension = self._config.file_type.get("file_extension")

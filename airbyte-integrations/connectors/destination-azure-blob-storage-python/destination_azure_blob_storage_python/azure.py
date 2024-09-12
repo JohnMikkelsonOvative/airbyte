@@ -111,7 +111,7 @@ class AzureHandler:
 
         #build path
         path_name = ""
-        if self._config.path_name is not "":
+        if self._config.path_name != "":
             path_name = path_name + self._config.path_name + "/"
 
         if stream_name:
@@ -128,9 +128,6 @@ class AzureHandler:
             name = name + ".parquet"
         #uploads blob with name to the container
         self._client.upload_blob(path_name + name, buf.getvalue().to_pybytes(), overwrite=True)
-
-
-
 
     def write_csv(self, messages, stream_name, flattening, file_extension):
         if flattening == "Root level flattening":
