@@ -10,11 +10,13 @@ from retrying import retry
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+from pyarrow import csv
 from fastavro import writer, parse_schema, reader
 from io import BytesIO
 import datetime
 import json
 import pickle
+
 
 from time import time
 
@@ -58,7 +60,7 @@ class AzureHandler:
     def head_blob(self) -> bool:
         return self._client.exists()
 
-    def write_parquet(self, messages, stream_name, stream_schema):
+    def write_parquet(self, messages, stream_name, stream_schema, file_extension):
         table_fields = []
         array_cols = []
         array_dates = []
@@ -121,6 +123,36 @@ class AzureHandler:
         # write parquet file from table to buffer stream
         pq.write_table(table, buf)
         current_timestamp = int(time() * 1000)
-        name = str(current_timestamp) + ".parquet"
+        name = str(current_timestamp)
+        if file_extension:
+            name = name + ".parquet"
+        #uploads blob with name to the container
+        self._client.upload_blob(path_name + name, buf.getvalue().to_pybytes(), overwrite=True)
+
+    def write_csv(self, messages, stream_name, flattening, file_extension):
+        if flattening == "Root level flattening":
+            messages = pd.json_normalize(
+                messages, max_level=1
+            )
+        df = pd.DataFrame(messages)
+        buf = pa.BufferOutputStream()
+
+        df.to_csv(buf)  # filling that buffer
+
+        #build path
+        path_name = ""
+        if self._config.path_name is not "":
+            path_name = path_name + self._config.path_name + "/"
+
+        if stream_name:
+            path_name = path_name + stream_name + "/"
+
+        if self._stream_time:
+            path_name = path_name + self._stream_time + "/"
+
+        current_timestamp = int(time() * 1000)
+        name = str(current_timestamp)
+        if file_extension:
+            name = name + ".csv"
         #uploads blob with name to the container
         self._client.upload_blob(path_name + name, buf.getvalue().to_pybytes(), overwrite=True)

@@ -161,12 +161,21 @@ class StreamWriter:
     def flush(self, partial: bool = False):
         logger.debug(f"Flushing {len(self._messages)} messages")
 
+        print("flushing # of records: ", len(self._messages))
+
         if len(self._messages) < 1:
             logger.info(f"No messages to write")
             return
 
-        if self._config.file_type.get("format_type") == "parquet":
-            self._azure_handler.write_parquet(self._messages, self._table, self._schema)
+        format_type = self._config.file_type.get("format_type")
+        flattening = self._config.file_type.get("flattening")
+        file_extension = self._config.file_type.get("file_extension")
+
+        if format_type == "parquet":
+            self._azure_handler.write_parquet(self._messages, self._table, self._schema, file_extension)
+
+        if format_type == "csv":
+            self._azure_handler.write_csv(self._messages, self._table, flattening, file_extension)
 
         if partial:
             self._partial_flush_count += 1
