@@ -169,16 +169,16 @@ class StreamWriter:
 
         format_type = self._config.file_type.get("format_type")
         flattening = self._config.file_type.get("flattening")
-        file_extension = self._config.file_type.get("file_extension")
+        #file_extension = self._config.file_type.get("file_extension")
 
         if format_type == "parquet":
-            self._azure_handler.write_parquet(self._messages, self._table, self._schema, file_extension)
+            self._azure_handler.write_parquet(self._messages, self._table, self._schema)
 
         if format_type == "csv":
-            self._azure_handler.write_csv(self._messages, self._table, flattening, file_extension)
+            self._azure_handler.write_csv(self._messages, self._table, flattening)
 
         if format_type == "avro":
-            self._azure_handler.write_avro(self._messages, self._table, self._schema, file_extension)
+            self._azure_handler.write_avro(self._messages, self._table, self._schema)
 
         if partial:
             self._partial_flush_count += 1

@@ -63,7 +63,7 @@ class AzureHandler:
     def head_blob(self) -> bool:
         return self._client.exists()
 
-    def write_parquet(self, messages, stream_name, stream_schema, file_extension):
+    def write_parquet(self, messages, stream_name, stream_schema):
         table_fields = []
         array_cols = []
         array_dates = []
@@ -87,6 +87,9 @@ class AzureHandler:
             elif "array" in col_typ:
                 array_cols.append(col)
                 table_fields.append(pa.field(col, pa.list_(pa.string())))
+
+            elif "boolean" in col_typ:
+                table_fields.append(pa.field(col, pa.bool_()))
 
             else:
                 table_fields.append(pa.field(col, pa.string()))
@@ -127,12 +130,12 @@ class AzureHandler:
         pq.write_table(table, buf)
         current_timestamp = int(time() * 1000)
         name = str(current_timestamp)
-        if file_extension:
-            name = name + ".parquet"
+        #if file_extension:
+        name = name + ".parquet"
         #uploads blob with name to the container
         self._client.upload_blob(path_name + name, buf.getvalue().to_pybytes(), overwrite=True)
 
-    def write_csv(self, messages, stream_name, flattening, file_extension):
+    def write_csv(self, messages, stream_name, flattening):
         if flattening == "Root level flattening":
             messages = pd.json_normalize(
                 messages, max_level=1
@@ -155,12 +158,12 @@ class AzureHandler:
 
         current_timestamp = int(time() * 1000)
         name = str(current_timestamp)
-        if file_extension:
-            name = name + ".csv"
+        #if file_extension:
+        name = name + ".csv"
         #uploads blob with name to the container
         self._client.upload_blob(path_name + name, buf.getvalue().to_pybytes(), overwrite=True)
 
-    def write_avro(self, messages, stream_name, stream_schema, file_extension):
+    def write_avro(self, messages, stream_name, stream_schema):
         array_cols = []
         for col, definition in stream_schema.items():
             col_typ = definition.get("type")
@@ -270,8 +273,8 @@ class AzureHandler:
 
         current_timestamp = int(time() * 1000)
         name = str(current_timestamp)
-        if file_extension:
-            name = name + ".avro"
+        #if file_extension:
+        name = name + ".avro"
 
         # Prepare the Avro file writer
         avro_filename = 'output_data.avro'

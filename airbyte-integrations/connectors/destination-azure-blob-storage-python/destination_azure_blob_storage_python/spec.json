@@ -46,12 +46,6 @@
                 "type": "string",
                 "const": "csv"
               },
-              "file_extension": {
-                "title": "File Extension",
-                "type": "boolean",
-                "default": false,
-                "description": "Add file extensions to the output file."
-              },
               "flattening": {
                 "type": "string",
                 "title": "Normalization (Flattening)",
@@ -68,12 +62,6 @@
               "format_type": {
                 "type": "string",
                 "const": "parquet"
-              },
-              "file_extension": {
-                "title": "File Extension",
-                "type": "boolean",
-                "default": false,
-                "description": "Add file extensions to the output file."
               }
             }
           },
@@ -84,12 +72,6 @@
               "format_type": {
                 "type": "string",
                 "const": "avro"
-              },
-              "file_extension": {
-                "title": "File Extension",
-                "type": "boolean",
-                "default": false,
-                "description": "Add file extensions to the output file."
               }
             }
           }
@@ -104,7 +86,7 @@
           {
             "title": "Authenticate via Storage Account Key",
             "type": "object",
-            "required": ["auth_type"],
+            "required": ["auth_type","azure_blob_storage_account_key"],
             "properties": {
               "auth_type": {
                 "title": "Auth Type",
@@ -127,14 +109,15 @@
           {
             "title": "Authenticate via Service Principal Token",
             "type": "object",
-            "required": ["auth_type"],
+            "required": ["auth_type", "tenant_id", "client_secret", "client_id"],
             "properties": {
               "auth_type": {
                 "title": "Auth Type",
                 "default": "Service Principal Token",
                 "const": "Service Principal Token",
                 "enum": ["Service Principal Token"],
-                "type": "string"
+                "type": "string",
+                "required": ["auth_type"]
               },
               "tenant_id": {
                 "title": "Tenant Id",
