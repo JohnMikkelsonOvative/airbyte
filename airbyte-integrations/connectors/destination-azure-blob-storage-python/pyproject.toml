@@ -3,10 +3,10 @@ requires = [ "poetry-core>=1.0.0",]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-version = "0.3.4"
+version = "0.3.5"
 name = "destination-azure-blob-storage-python"
 description = "Destination implementation for azure-blob-storage-python."
-authors = [ "Airbyte <contact@airbyte.io>",]
+authors = [ "Tim Mock <tim.mock@ovative.com>", "Woodrow Keifenheim <woodrow.keifenheim@ovative.com"]
 license = "MIT"
 readme = "README.md"
 documentation = "https://docs.airbyte.com/integrations/destinations/azure-blob-storage-python"

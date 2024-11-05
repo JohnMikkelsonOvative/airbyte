@@ -96,7 +96,7 @@ class StreamWriter:
                 for key, val in value.items():
                     if key in props:
                         value[key] = self._json_schema_cast_value(val, props[key])
-                return value
+                return json.dumps(value, default=str)
 
         elif typ == "array" and items:
             if value in EMPTY_VALUES:
