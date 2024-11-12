@@ -34,16 +34,12 @@ class AzureHandler:
         self._client: ContainerClient = None
         self._destination: Destination = destination
         self._blob_client: BlobClient = None
-        self._stream_time = None
 
         self.create_client()
 
     @retry(stop_max_attempt_number=10, wait_random_min=1000)
     def create_client(self) -> None:
         client_credential: str | ClientSecretCredential
-
-        #create stream timestamp
-        self._stream_time = datetime.datetime.today().strftime('%Y-%m-%d')
 
         if self._config.credentials_type == CredentialsType.SAS_TOKEN:
             client_credential = self._config.sas_token
@@ -63,7 +59,18 @@ class AzureHandler:
     def head_blob(self) -> bool:
         return self._client.exists()
 
-    def write_parquet(self, messages, stream_name, stream_schema):
+    def delete_blobs_in_path(self, path_name):
+        blobs_to_delete = self._client.list_blobs(name_starts_with=path_name)
+        for blob in blobs_to_delete:
+            # Check if blob is directly in the specified folder
+            # A blob is directly in the folder if there are no extra '/' after folder_path
+            relative_path = blob.name[len(path_name):]  # Remove the folder path prefix
+            if '/' not in relative_path:  # Only proceed if no further subdirectory
+                blob_client = self._client.get_blob_client(blob)
+                blob_client.delete_blob()
+                print(f"Deleted blob: {blob.name}")
+
+    def write_parquet(self, messages, path_name, stream_schema):
         table_fields = []
         array_cols = []
         array_dates = []
@@ -115,17 +122,6 @@ class AzureHandler:
 
         buf = pa.BufferOutputStream()
 
-        #build path
-        path_name = ""
-        if self._config.path_name != "":
-            path_name = path_name + self._config.path_name + "/"
-
-        if stream_name:
-            path_name = path_name + stream_name + "/"
-
-        if self._stream_time:
-            path_name = path_name + self._stream_time + "/"
-
         # write parquet file from table to buffer stream
         pq.write_table(table, buf)
         current_timestamp = int(time() * 1000)
@@ -135,7 +131,7 @@ class AzureHandler:
         #uploads blob with name to the container
         self._client.upload_blob(path_name + name, buf.getvalue().to_pybytes(), overwrite=True)
 
-    def write_csv(self, messages, stream_name, flattening):
+    def write_csv(self, messages, path_name, flattening):
         if flattening == "Root level flattening":
             messages = pd.json_normalize(
                 messages, max_level=1
@@ -145,17 +141,6 @@ class AzureHandler:
 
         df.to_csv(buf)  # filling that buffer
 
-        #build path
-        path_name = ""
-        if self._config.path_name != "":
-            path_name = path_name + self._config.path_name + "/"
-
-        if stream_name:
-            path_name = path_name + stream_name + "/"
-
-        if self._stream_time:
-            path_name = path_name + self._stream_time + "/"
-
         current_timestamp = int(time() * 1000)
         name = str(current_timestamp)
         #if file_extension:
@@ -163,7 +148,7 @@ class AzureHandler:
         #uploads blob with name to the container
         self._client.upload_blob(path_name + name, buf.getvalue().to_pybytes(), overwrite=True)
 
-    def write_avro(self, messages, stream_name, stream_schema):
+    def write_avro(self, messages, path_name, stream_schema):
         array_cols = []
         for col, definition in stream_schema.items():
             col_typ = definition.get("type")
@@ -260,16 +245,6 @@ class AzureHandler:
         # Print the reordered list of dictionaries
 
         schema = avro.schema.parse(schema_json)
-
-        path_name = ""
-        if self._config.path_name != "":
-            path_name = path_name + self._config.path_name + "/"
-
-        if stream_name:
-            path_name = path_name + stream_name + "/"
-
-        if self._stream_time:
-            path_name = path_name + self._stream_time + "/"
 
         current_timestamp = int(time() * 1000)
         name = str(current_timestamp)
