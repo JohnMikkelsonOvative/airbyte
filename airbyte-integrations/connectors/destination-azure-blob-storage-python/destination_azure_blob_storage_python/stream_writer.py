@@ -40,6 +40,8 @@ class StreamWriter:
         self._schema: Dict[str, Any] = configured_stream.stream.json_schema["properties"]
         self._sync_mode: DestinationSyncMode = configured_stream.destination_sync_mode
 
+        self._overwritten: bool = False
+
         self._table_exists: bool = False
         self._table: str = configured_stream.stream.name
 
@@ -169,16 +171,29 @@ class StreamWriter:
 
         format_type = self._config.file_type.get("format_type")
         flattening = self._config.file_type.get("flattening")
-        #file_extension = self._config.file_type.get("file_extension")
+
+        stream_name = self._table
+        stream_time = datetime.today().strftime('%Y-%m-%d')
+        path_name = ""
+        if self._config.path_name != "":
+            path_name = path_name + self._config.path_name + "/"
+
+        if stream_name:
+            path_name = path_name + stream_name + "/" + stream_time + "/"
+
+        if self._sync_mode == DestinationSyncMode.overwrite and self._overwritten == False:
+            self._azure_handler.delete_blobs_in_path(path_name)
+            print("Data cleared")
+            self._overwritten = True
 
         if format_type == "parquet":
-            self._azure_handler.write_parquet(self._messages, self._table, self._schema)
+            self._azure_handler.write_parquet(self._messages, path_name, self._schema)
 
         if format_type == "csv":
-            self._azure_handler.write_csv(self._messages, self._table, flattening)
+            self._azure_handler.write_csv(self._messages, path_name, flattening)
 
         if format_type == "avro":
-            self._azure_handler.write_avro(self._messages, self._table, self._schema)
+            self._azure_handler.write_avro(self._messages, path_name, self._schema)
 
         if partial:
             self._partial_flush_count += 1
